@@ -1,0 +1,15 @@
+baseURL = "https://docs.example.com/"
+title = "Docs Fixture"
+defaultContentLanguage = "en"
+
+[params]
+description = "A documentation fixture"
+
+[languages.en]
+languageName = "English"
+weight = 1
+
+[languages.zh-cn]
+languageName = "中文"
+title = "文档夹具"
+weight = 2

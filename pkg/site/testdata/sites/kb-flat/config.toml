@@ -1,0 +1,5 @@
+baseURL = "https://kb.example.com"
+title = "Fixture"
+
+[params]
+description = "Example knowledge base for testing"

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":disableDependencyDashboard"
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update golangci-lint version in GitHub workflows",
+      "fileMatch": [
+        "\\.github/workflows/golangci-lint\\.yml$"
+      ],
+      "matchStrings": [
+        "version: v(?<currentValue>[\\d.]+)"
+      ],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases"
+    }
+  ],
+  "automerge": true
+}

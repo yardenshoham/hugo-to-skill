@@ -1,0 +1,6 @@
+baseURL = "https://toml.example.com"
+title = "TOML Fixture"
+defaultContentLanguage = "en"
+
+[params]
+description = "A TOML-configured fixture"
