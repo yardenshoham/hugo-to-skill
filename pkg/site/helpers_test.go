@@ -29,6 +29,10 @@ func TestFirstH1(t *testing.T) {
 		{"not first line", "Some intro.\n\n# Later title\n", "Later title"},
 		{"h2 only", "## Subtitle\n", ""},
 		{"empty", "", ""},
+		{"inside fence", "```sh\n# a comment\n```\n\n# Real title\n", "Real title"},
+		{"inside tilde fence", "~~~\n# nope\n~~~\n", ""},
+		{"indented code", "    # indented comment\n", ""},
+		{"heading indented up to 3 spaces", "   # Indented heading\n", "Indented heading"},
 	}
 	for _, tt := range tests {
 		if got := firstH1([]byte(tt.body)); got != tt.want {

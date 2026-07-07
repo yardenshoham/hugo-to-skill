@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gohugoio/hugo/common/paths"
 	"github.com/gohugoio/hugo/parser"
@@ -177,7 +178,7 @@ func generateSkill(s *site.Site, w io.Writer, config Config, name string) error 
 	title := effectiveTitle(s)
 	description := cmp.Or(config.Description, autoDescription(s, title))
 	if len(description) > maxDescriptionLen {
-		description = description[:maxDescriptionLen-1] + "…"
+		description = truncate(description, maxDescriptionLen)
 	}
 	baseURL := displayBaseURL(s.BaseURL)
 
@@ -201,8 +202,9 @@ func generateSkill(s *site.Site, w io.Writer, config Config, name string) error 
 	fmt.Fprintf(w, "\n## How to use this skill\n\n")
 	fmt.Fprintf(w, "- Find the most relevant page in the contents below and read it before answering.\n")
 	fmt.Fprintf(w, "- For keyword lookups across all pages, grep the `references/` directory.\n")
-	fmt.Fprintf(w, "- Pages are verbatim copies of the site's Hugo source: they start with front matter\n"+
-		"  metadata and may contain shortcodes like `{{< note >}}`; read through them.\n")
+	fmt.Fprintf(w, "- Pages are verbatim copies of the site's Hugo source (section `_index.md` files also\n"+
+		"  get a generated listing appended): they start with front matter metadata and may\n"+
+		"  contain shortcodes like `{{< note >}}`; read through them.\n")
 	fmt.Fprintf(w, "- Links inside pages: relative links point at sibling files here; `{{< relref \"x\" >}}` /\n"+
 		"  `{{< ref \"x\" >}}` and site-absolute links name a content page — find the matching file\n"+
 		"  under `references/`%s.\n", browseHint(baseURL))
@@ -394,6 +396,17 @@ func autoDescription(s *site.Site, title string) string {
 		return fmt.Sprintf("%s. Use when answering questions about %s.", title, title)
 	}
 	return fmt.Sprintf("%s — %s Use when answering questions about %s.", title, ensureSentence(desc), title)
+}
+
+// truncate shortens s to at most maxBytes bytes, ending with an ellipsis and
+// never splitting a multi-byte rune.
+func truncate(s string, maxBytes int) string {
+	const ellipsis = "…"
+	cut := maxBytes - len(ellipsis)
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + ellipsis
 }
 
 // ensureSentence makes sure s ends with sentence punctuation.

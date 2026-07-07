@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/gohugoio/hugo/parser/pageparser"
 	"github.com/yardenshoham/hugo-to-skill/pkg/site"
@@ -236,6 +237,52 @@ func TestSkillName(t *testing.T) {
 		if len(got) > maxNameLen || !nameRegexp.MatchString(got) {
 			t.Errorf("skillName(%q, %q, %q) = %q violates the spec", tt.title, tt.scope, tt.override, got)
 		}
+	}
+}
+
+// TestTruncate checks the description limit is enforced in bytes without ever
+// splitting a multi-byte rune.
+func TestTruncate(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		in       string
+		maxBytes int
+		want     string
+	}{
+		{"ascii", "abcdef", 5, "ab…"},
+		{"multibyte at boundary", "aéééé", 5, "a…"}, // cutting at byte 2 would split the first é
+		{"exact rune boundary", "ééééé", 7, "éé…"},
+	}
+	for _, tt := range tests {
+		if got := truncate(tt.in, tt.maxBytes); got != tt.want {
+			t.Errorf("%s: truncate(%q, %d) = %q, want %q", tt.name, tt.in, tt.maxBytes, got, tt.want)
+		}
+	}
+}
+
+// TestGenerateSkillDescriptionTruncation checks an overlong multi-byte
+// description survives generation as valid UTF-8 within the spec limit.
+func TestGenerateSkillDescriptionTruncation(t *testing.T) {
+	t.Parallel()
+	s := &site.Site{Title: "Big", Root: &site.Section{}}
+	var buf bytes.Buffer
+	if err := generateSkill(s, &buf, Config{Description: strings.Repeat("é", 600)}, "big"); err != nil {
+		t.Fatalf("generateSkill failed: %v", err)
+	}
+	cfm, err := pageparser.ParseFrontMatterAndContent(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatalf("parsing generated frontmatter: %v", err)
+	}
+	description, _ := cfm.FrontMatter["description"].(string)
+	if len(description) > maxDescriptionLen {
+		t.Errorf("description is %d bytes, want ≤ %d", len(description), maxDescriptionLen)
+	}
+	if !utf8.ValidString(description) {
+		t.Error("description is not valid UTF-8")
+	}
+	if !strings.HasSuffix(description, "…") {
+		t.Errorf("description does not end with an ellipsis: %q", description[len(description)-20:])
 	}
 }
 

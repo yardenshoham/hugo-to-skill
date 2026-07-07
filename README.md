@@ -23,6 +23,8 @@ hugo-to-skill generate https://github.com/kubernetes/website --lang en --content
 
 Content pages are copied into the skill's `references/` directory, mirroring the Hugo content tree. The generated `SKILL.md` and per-section `_index.md` listings provide the hierarchical index.
 
+Only content pages (`.md`, `.html`) are copied — bundle resources such as images or data files are not, so relative links to them inside pages won't resolve locally.
+
 ## Flags
 
 | Flag               | Description                                                                                                              |
@@ -70,8 +72,9 @@ Cloud native distributed block storage for Kubernetes.
 
 - Find the most relevant page in the contents below and read it before answering.
 - For keyword lookups across all pages, grep the `references/` directory.
-- Pages are verbatim copies of the site's Hugo source: they start with front matter
-  metadata and may contain shortcodes like `{{< note >}}`; read through them.
+- Pages are verbatim copies of the site's Hugo source (section `_index.md` files also
+  get a generated listing appended): they start with front matter metadata and may
+  contain shortcodes like `{{< note >}}`; read through them.
 - Links inside pages: relative links point at sibling files here; `{{< relref "x" >}}` /
   `{{< ref "x" >}}` and site-absolute links name a content page — find the matching file
   under `references/`, or browse https://longhorn.io/ + the path.

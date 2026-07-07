@@ -197,10 +197,23 @@ func cleanScope(contentPath string) (string, error) {
 	return scope, nil
 }
 
-// firstH1 returns the text of the first ATX H1 in body, if any.
+// firstH1 returns the text of the first ATX H1 in body, if any. Lines inside
+// fenced code blocks (a simple open/close toggle, close-marker length not
+// checked) and indented code (4+ spaces) are not headings.
 func firstH1(body []byte) string {
+	inFence := false
 	for line := range strings.SplitSeq(string(body), "\n") {
 		trimmed := strings.TrimLeft(line, " ")
+		if len(line)-len(trimmed) > 3 {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
 		if rest, ok := strings.CutPrefix(trimmed, "# "); ok {
 			return strings.TrimSpace(rest)
 		}

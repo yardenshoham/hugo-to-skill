@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -129,10 +130,15 @@ func buildSites(ctx context.Context, configs *allconfig.Configs, flags config.Pr
 	return sites, nil
 }
 
+// loggedErrorsRegexp matches the exact error hugolib's Build returns
+// (unwrapped) when errors were merely logged during an otherwise complete
+// build: fmt.Errorf("logged %d error(s)", errorCount).
+var loggedErrorsRegexp = regexp.MustCompile(`^logged \d+ error\(s\)$`)
+
 // isLoggedErrorsAggregate reports whether err is Hugo's post-assembly
 // "logged N error(s)" aggregate rather than a fatal assembly error.
 func isLoggedErrorsAggregate(err error) bool {
-	return strings.Contains(err.Error(), "error(s)")
+	return loggedErrorsRegexp.MatchString(err.Error())
 }
 
 // contentOverrides computes the config flags Hugo needs to read the site's

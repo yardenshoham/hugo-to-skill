@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"runtime/debug"
 
 	"github.com/spf13/cobra"
@@ -21,7 +22,7 @@ func newVersionCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			info, ok := debug.ReadBuildInfo()
 			if !ok {
-				panic("failed to read build info")
+				return errors.New("failed to read build info")
 			}
 			return json.NewEncoder(cmd.OutOrStdout()).Encode(versionInfo{
 				Version:   info.Main.Version,

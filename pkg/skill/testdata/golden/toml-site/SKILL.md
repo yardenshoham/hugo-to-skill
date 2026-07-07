@@ -11,8 +11,9 @@ A TOML-configured fixture.
 
 - Find the most relevant page in the contents below and read it before answering.
 - For keyword lookups across all pages, grep the `references/` directory.
-- Pages are verbatim copies of the site's Hugo source: they start with front matter
-  metadata and may contain shortcodes like `{{< note >}}`; read through them.
+- Pages are verbatim copies of the site's Hugo source (section `_index.md` files also
+  get a generated listing appended): they start with front matter metadata and may
+  contain shortcodes like `{{< note >}}`; read through them.
 - Links inside pages: relative links point at sibling files here; `{{< relref "x" >}}` /
   `{{< ref "x" >}}` and site-absolute links name a content page — find the matching file
   under `references/`, or browse https://toml.example.com/ + the path.
