@@ -1,0 +1,11 @@
+baseURL = "https://docsy.example.com/"
+title = "Docsy-like Fixture"
+theme = ["nonexistent-docsy-module"]
+
+[caches]
+  [caches.getcsv]
+    dir = ":cacheDir/:project"
+    maxAge = "10s"
+
+[outputs]
+section = ["HTML", "print"]

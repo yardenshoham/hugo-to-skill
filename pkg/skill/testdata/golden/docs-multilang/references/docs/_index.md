@@ -9,6 +9,7 @@ The fixture documentation.
 
 - [Getting started](getting-started.md) — First steps with the fixture
 - [Install](install/index.md) — Installing the fixture
+- [Never rendered](never-render.md)
 
 ## Subsections
 

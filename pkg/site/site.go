@@ -1,7 +1,10 @@
 // Package site loads a Hugo site's config and content tree into a model the
-// skill generator can consume. It reads config through Hugo's own config
-// package and front matter through Hugo's pageparser; page files themselves
-// are never modified.
+// skill generator can consume. It runs the site through Hugo's own assemble
+// pipeline (hugolib with SkipRender: content is read, bundles and sections are
+// resolved, unpublishable pages are filtered, and pages are ordered — but no
+// templates are rendered), then projects the result onto a small tree model.
+// Page source files themselves are never modified; the generator copies them
+// byte-for-byte.
 package site
 
 import (
@@ -9,14 +12,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/gohugoio/hugo/hugolib"
+	"github.com/spf13/cast"
 )
 
 // Site is the loaded model of a Hugo site, scoped to one language and
@@ -93,89 +96,50 @@ func Load(ctx context.Context, dir string, opts LoadOptions, logger *slog.Logger
 		return nil, fmt.Errorf("resolving site directory: %w", err)
 	}
 
-	cfg, found, err := loadConfig(ctx, absDir, logger)
+	built, err := assemble(ctx, absDir, opts, logger)
 	if err != nil {
 		return nil, err
 	}
-	if !found {
-		logger.WarnContext(ctx, "no Hugo config found, auto-detecting content root", "dir", absDir)
-	}
+	defer built.cleanup()
+	cfg := built.cfg
 
 	selectedLang := strings.ToLower(cmp.Or(opts.Lang, cfg.defaultLang))
-	defaultLang := cfg.defaultLang
-
-	contentRoot, langScoped, err := resolveContentRoot(absDir, cfg, found, selectedLang)
+	hugoSite, err := selectSite(built.sites.Sites, selectedLang, cfg)
 	if err != nil {
 		return nil, err
 	}
-	if langScoped {
-		// Inside a language-specific content dir, suffix-less files belong
-		// to that language rather than the site default.
-		defaultLang = selectedLang
+	logger.DebugContext(ctx, "selected language", "lang", selectedLang)
+
+	root := projectSection(hugoSite.Home())
+	if root == nil {
+		return nil, fmt.Errorf("no content pages found for language %s", selectedLang)
 	}
-	logger.DebugContext(ctx, "resolved content root", "dir", contentRoot, "lang", selectedLang)
 
 	scope, err := cleanScope(opts.ContentPath)
 	if err != nil {
 		return nil, err
 	}
-	walkRoot := contentRoot
-	if scope != "" {
-		walkRoot = filepath.Join(contentRoot, filepath.FromSlash(scope))
-		info, err := os.Stat(walkRoot)
-		if err != nil {
-			return nil, fmt.Errorf("content path %s: %w", scope, err)
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("content path %s is not a directory", scope)
-		}
-	}
-
-	langs := make(map[string]bool, len(cfg.languages)+1)
-	for lang := range cfg.languages {
-		langs[strings.ToLower(lang)] = true
-	}
-	langs[defaultLang] = true
-	if !langs[selectedLang] && len(cfg.languages) > 0 {
-		return nil, fmt.Errorf("language %s is not configured for this site", selectedLang)
-	}
-
-	w := &walker{
-		selectedLang:  selectedLang,
-		defaultLang:   defaultLang,
-		langs:         langs,
-		includeDrafts: opts.IncludeDrafts,
-		now:           time.Now(),
-		logger:        logger,
-		ctx:           ctx,
-	}
-	section, err := w.walkSection(walkRoot, scope)
-	if err != nil {
-		return nil, err
-	}
-	if section == nil {
-		return nil, fmt.Errorf("no content pages found under %s", walkRoot)
-	}
-
-	root := section
 	var scoped *Section
 	if scope != "" {
-		scoped = section
-		root = &Section{Path: "", Sections: []*Section{section}}
+		scoped = findSection(root, scope)
+		if scoped == nil {
+			return nil, fmt.Errorf("content path %s not found in the content tree", scope)
+		}
+		root = &Section{Sections: []*Section{scoped}}
 	}
 
-	title := cfg.title
-	if langCfg, ok := cfg.languages[selectedLang]; ok && langCfg.title != "" {
-		title = langCfg.title
-	}
+	// Hugo merges the base title into each language's config and applies any
+	// per-language override, so the selected site's Title() is already the
+	// effective one; fall back to the directory name only when it is empty.
+	title := hugoSite.Title()
 	if title == "" {
 		title = humanize(filepath.Base(absDir))
 	}
 
 	site := &Site{
 		Title:       title,
-		Description: cfg.description,
-		BaseURL:     cfg.baseURL,
+		Description: cast.ToString(hugoSite.Params()["description"]),
+		BaseURL:     hugoSite.BaseURL(),
 		Scope:       scope,
 		Root:        root,
 		Scoped:      scoped,
@@ -184,49 +148,37 @@ func Load(ctx context.Context, dir string, opts LoadOptions, logger *slog.Logger
 	return site, nil
 }
 
-// resolveContentRoot picks the directory to walk: the selected language's
-// content dir when configured (or present by convention), the site's content
-// dir otherwise, or the site dir itself when it directly holds content.
-// langScoped reports whether the returned dir holds a single language's
-// content.
-func resolveContentRoot(dir string, cfg *siteConfig, configFound bool, lang string) (root string, langScoped bool, err error) {
-	if !configFound {
-		if hasContentFiles(dir) {
-			return dir, false, nil
-		}
-		contentDir := filepath.Join(dir, "content")
-		if info, err := os.Stat(contentDir); err == nil && info.IsDir() {
-			return contentDir, false, nil
-		}
-		return "", false, fmt.Errorf("no Hugo config and no content found in %s", dir)
-	}
-
-	contentDir := cfg.contentDir
-	if langCfg, ok := cfg.languages[lang]; ok {
-		if langCfg.contentDir != "" {
-			return filepath.Join(dir, filepath.FromSlash(langCfg.contentDir)), true, nil
-		}
-		// Convention: per-language subdirectories like content/en, content/zh-cn.
-		byConvention := filepath.Join(dir, filepath.FromSlash(contentDir), lang)
-		if info, err := os.Stat(byConvention); err == nil && info.IsDir() {
-			return byConvention, true, nil
+// selectSite picks the built site for the selected language. A site with
+// languages configured must have the selected one; an unconfigured single
+// language falls through to Hugo's sole site.
+func selectSite(sites []*hugolib.Site, selectedLang string, cfg *siteConfig) (*hugolib.Site, error) {
+	if len(cfg.languages) > 0 {
+		if _, ok := cfg.languages[selectedLang]; !ok {
+			return nil, fmt.Errorf("language %s is not configured for this site", selectedLang)
 		}
 	}
-	return filepath.Join(dir, filepath.FromSlash(contentDir)), false, nil
+	for _, s := range sites {
+		if strings.EqualFold(s.Language().Lang, selectedLang) {
+			return s, nil
+		}
+	}
+	if len(sites) > 0 && len(cfg.languages) == 0 {
+		return sites[0], nil
+	}
+	return nil, fmt.Errorf("language %s produced no site", selectedLang)
 }
 
-// hasContentFiles reports whether dir directly contains content files.
-func hasContentFiles(dir string) bool {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false
+// findSection returns the section at the given content-relative path.
+func findSection(root *Section, target string) *Section {
+	if root.Path == target {
+		return root
 	}
-	for _, entry := range entries {
-		if !entry.IsDir() && isContentFile(entry.Name()) {
-			return true
+	for _, child := range root.Sections {
+		if found := findSection(child, target); found != nil {
+			return found
 		}
 	}
-	return false
+	return nil
 }
 
 // cleanScope normalizes a --content-path value to a clean slash-separated
@@ -245,41 +197,15 @@ func cleanScope(contentPath string) (string, error) {
 	return scope, nil
 }
 
-// hugoLess is Hugo's default list order: weight ascending with zero/missing
-// weights last, then lowercased title, then path.
-func hugoLess(wi, wj int, ti, tj, pi, pj string) bool {
-	if wi != wj {
-		if wi == 0 || wj == 0 {
-			return wj == 0
+// firstH1 returns the text of the first ATX H1 in body, if any.
+func firstH1(body []byte) string {
+	for line := range strings.SplitSeq(string(body), "\n") {
+		trimmed := strings.TrimLeft(line, " ")
+		if rest, ok := strings.CutPrefix(trimmed, "# "); ok {
+			return strings.TrimSpace(rest)
 		}
-		return wi < wj
 	}
-	if ti, tj := strings.ToLower(ti), strings.ToLower(tj); ti != tj {
-		return ti < tj
-	}
-	return pi < pj
-}
-
-// sortPages orders pages the way Hugo lists them by default.
-func sortPages(pages []*Page) {
-	sort.SliceStable(pages, func(i, j int) bool {
-		a, b := pages[i], pages[j]
-		return hugoLess(a.Weight, b.Weight, a.Title, b.Title, a.Path, b.Path)
-	})
-}
-
-// sortSections orders sections by their index page's weight, then title.
-func sortSections(sections []*Section) {
-	weight := func(s *Section) int {
-		if s.Page != nil {
-			return s.Page.Weight
-		}
-		return 0
-	}
-	sort.SliceStable(sections, func(i, j int) bool {
-		a, b := sections[i], sections[j]
-		return hugoLess(weight(a), weight(b), a.Title(), b.Title(), a.Path, b.Path)
-	})
+	return ""
 }
 
 var titleReplacer = strings.NewReplacer("-", " ", "_", " ")

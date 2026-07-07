@@ -22,12 +22,13 @@ A documentation fixture.
 
 ## Contents
 
-### [Docs Fixture](references/_index.md) — 7 pages
+### [Docs Fixture](references/_index.md) — 8 pages
 
-### [Documentation](references/docs/_index.md) — 6 pages
+### [Documentation](references/docs/_index.md) — 7 pages
 
 - [Getting started](references/docs/getting-started.md) — First steps with the fixture
 - [Install](references/docs/install/index.md) — Installing the fixture
+- [Never rendered](references/docs/never-render.md)
 
 ### [Concepts](references/docs/concepts/_index.md) — 3 pages
 

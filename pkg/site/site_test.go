@@ -41,18 +41,6 @@ func pagePaths(sec *Section) []string {
 	return out
 }
 
-func findSection(root *Section, path string) *Section {
-	if root.Path == path {
-		return root
-	}
-	for _, child := range root.Sections {
-		if found := findSection(child, path); found != nil {
-			return found
-		}
-	}
-	return nil
-}
-
 func assertPaths(t *testing.T, sec *Section, want []string) {
 	t.Helper()
 	if got := pagePaths(sec); !slices.Equal(got, want) {
@@ -70,7 +58,7 @@ func TestLoadKbFlat(t *testing.T) {
 	if site.Description != "Example knowledge base for testing" {
 		t.Errorf("Description = %q", site.Description)
 	}
-	if site.BaseURL != "https://kb.example.com" {
+	if site.BaseURL != "https://kb.example.com/" {
 		t.Errorf("BaseURL = %q", site.BaseURL)
 	}
 	if site.Scope != "" {
@@ -145,6 +133,36 @@ func TestLoadKbFlatScoped(t *testing.T) {
 	}
 }
 
+// TestLoadDocsyLike exercises the failure modes of a real theme-module site
+// (e.g. kubernetes.io on Docsy) whose build toolchain is not present: content
+// uses shortcodes with no local templates (including a nested one), the
+// project's render hooks reference a partial only the module provides, the
+// config declares a cache key and output format our Hugo version no longer
+// knows, and a page carries the removed "_build" front matter key. The loader
+// must still assemble the tree.
+func TestLoadDocsyLike(t *testing.T) {
+	t.Parallel()
+	site := load(t, fixture("docsy-like"), LoadOptions{})
+
+	if site.Title != "Docsy-like Fixture" {
+		t.Errorf("Title = %q", site.Title)
+	}
+	assertPaths(t, site.Root, []string{
+		"_index.md",
+		"guide/_index.md",
+		"guide/install.md",   // weight 1
+		"guide/configure.md", // weight 2
+	})
+
+	guide := findSection(site.Root, "guide")
+	if guide == nil {
+		t.Fatal("guide section not found")
+	}
+	if guide.Pages[0].Title != "Install" {
+		t.Errorf("guide first page = %q, want Install", guide.Pages[0].Title)
+	}
+}
+
 func TestLoadDocsMultilang(t *testing.T) {
 	t.Parallel()
 	site := load(t, fixture("docs-multilang"), LoadOptions{})
@@ -153,14 +171,16 @@ func TestLoadDocsMultilang(t *testing.T) {
 		t.Errorf("Title = %q, want Docs Fixture", site.Title)
 	}
 
-	// Default language en via content/en convention; drafts, future,
-	// expired, headless, and build.render=never pages excluded; leaf bundle
-	// resources excluded.
+	// Default language en via content/en convention; drafts, future, expired,
+	// and headless pages excluded by Hugo; leaf bundle resources excluded. A
+	// build.render=never page (never-render.md) stays in the tree — Hugo keeps
+	// it in its page collections, so we surface it too.
 	assertPaths(t, site.Root, []string{
 		"_index.md",
 		"docs/_index.md",
 		"docs/getting-started.md",    // weight 1
 		"docs/install/index.md",      // weight 3 leaf bundle
+		"docs/never-render.md",       // unweighted page, before sections
 		"docs/concepts/_index.md",    // weight 2 section
 		"docs/concepts/volumes.md",   // weight 2
 		"docs/concepts/snapshots.md", // unweighted last
@@ -195,7 +215,7 @@ func TestLoadTomlSite(t *testing.T) {
 	if site.Title != "TOML Fixture EN" {
 		t.Errorf("per-language title override failed: %q", site.Title)
 	}
-	if site.BaseURL != "https://toml.example.com" {
+	if site.BaseURL != "https://toml.example.com/" {
 		t.Errorf("BaseURL = %q", site.BaseURL)
 	}
 
