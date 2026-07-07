@@ -50,7 +50,8 @@ type assembled struct {
 func assemble(ctx context.Context, absDir string, opts LoadOptions, logger *slog.Logger) (*assembled, error) {
 	// Pass 1: read the config as-is to learn languages, contentDir, and whether
 	// a config file exists, so we can compute the overrides Hugo needs.
-	cfg, _, found, err := loadConfig(ctx, newFlags(absDir), logger)
+	flags := newFlags(absDir)
+	cfg, _, found, err := loadConfig(ctx, flags, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -69,8 +70,8 @@ func assemble(ctx context.Context, absDir string, opts LoadOptions, logger *slog
 		return nil, err
 	}
 
-	// Pass 2: the authoritative load, with overrides applied, feeds the build.
-	flags := newFlags(absDir)
+	// Pass 2: the authoritative load, with the overrides added to the same flag
+	// layer (Hugo only reads from it during load), feeds the build.
 	for k, v := range overrides {
 		flags.Set(k, v)
 	}
