@@ -1,5 +1,4 @@
-When you change Go code, before stopping, test what you changed, run go fmt, go fix, and golangci-lint.
+When you change Go code, before stopping, test what you changed, run go fmt, go fix, golangci-lint, and `go run golang.org/x/tools/go/analysis/passes/modernize/cmd/modernize@latest -fix ./...` to apply modern Go idioms.
 
-When generating skills or any other files for temporary testing or exploration, use the `debug` directory. Manual acceptance check: `go run . generate https://github.com/longhorn/website --content-path kb -o debug/longhorn-kb`.
+When generating skills or any other files for temporary testing or exploration, use the `debug` directory.
 
-Never create git tags or releases — releasing is done manually. Running `goreleaser check` as validation is fine.
