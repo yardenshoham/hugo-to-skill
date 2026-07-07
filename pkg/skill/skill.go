@@ -70,7 +70,7 @@ var nameRegexp = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 func GenerateDir(ctx context.Context, s *site.Site, dir string, config Config, logger *slog.Logger) error {
 	name, err := skillName(s, config)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to determine skill name: %w", err)
 	}
 	if base := filepath.Base(dir); base != name {
 		logger.WarnContext(ctx, "skill name does not match the output directory name; the spec expects them to match",
@@ -79,25 +79,25 @@ func GenerateDir(ctx context.Context, s *site.Site, dir string, config Config, l
 
 	refsDir := filepath.Join(dir, refsDirName)
 	if err := os.RemoveAll(refsDir); err != nil {
-		return fmt.Errorf("clearing references directory: %w", err)
+		return fmt.Errorf("failed to clear references directory: %w", err)
 	}
 	if err := os.MkdirAll(refsDir, 0o755); err != nil {
-		return fmt.Errorf("creating references directory: %w", err)
+		return fmt.Errorf("failed to create references directory: %w", err)
 	}
 
 	skillPath := filepath.Join(dir, "SKILL.md")
 	logger.InfoContext(ctx, "writing SKILL.md", "path", skillPath)
 	f, err := os.Create(skillPath)
 	if err != nil {
-		return fmt.Errorf("creating SKILL.md: %w", err)
+		return fmt.Errorf("failed to create SKILL.md: %w", err)
 	}
 	defer f.Close()
 	buf := bufio.NewWriter(f)
 	if err := generateSkill(s, buf, config, name); err != nil {
-		return fmt.Errorf("generating SKILL.md: %w", err)
+		return fmt.Errorf("failed to generate SKILL.md: %w", err)
 	}
 	if err := buf.Flush(); err != nil {
-		return fmt.Errorf("writing SKILL.md: %w", err)
+		return fmt.Errorf("failed to write SKILL.md: %w", err)
 	}
 
 	return writeSection(ctx, s.Root, refsDir, logger)
@@ -107,7 +107,7 @@ func GenerateDir(ctx context.Context, s *site.Site, dir string, config Config, l
 func writeSection(ctx context.Context, sec *site.Section, refsDir string, logger *slog.Logger) error {
 	secDir := filepath.Join(refsDir, filepath.FromSlash(sec.Path))
 	if err := os.MkdirAll(secDir, 0o755); err != nil {
-		return fmt.Errorf("creating section directory %s: %w", sec.Path, err)
+		return fmt.Errorf("failed to create section directory %s: %w", sec.Path, err)
 	}
 
 	if hasIndex(sec) {
@@ -117,12 +117,12 @@ func writeSection(ctx context.Context, sec *site.Section, refsDir string, logger
 		if sec.Page != nil {
 			var err error
 			if source, err = os.ReadFile(sec.Page.SourcePath); err != nil {
-				return fmt.Errorf("reading section index %s: %w", sec.Page.Path, err)
+				return fmt.Errorf("failed to read section index %s: %w", sec.Page.Path, err)
 			}
 		}
 		f, err := os.Create(indexPath)
 		if err != nil {
-			return fmt.Errorf("creating section index: %w", err)
+			return fmt.Errorf("failed to create section index: %w", err)
 		}
 		buf := bufio.NewWriter(f)
 		err = GenerateSectionIndex(sec, source, buf)
@@ -131,7 +131,7 @@ func writeSection(ctx context.Context, sec *site.Section, refsDir string, logger
 		}
 		f.Close()
 		if err != nil {
-			return fmt.Errorf("generating section index for %s: %w", sec.Path, err)
+			return fmt.Errorf("failed to generate section index for %s: %w", sec.Path, err)
 		}
 	}
 
@@ -139,7 +139,7 @@ func writeSection(ctx context.Context, sec *site.Section, refsDir string, logger
 		dst := filepath.Join(refsDir, filepath.FromSlash(page.Path))
 		logger.DebugContext(ctx, "copying page", "page", page.Path)
 		if err := copyFile(page.SourcePath, dst); err != nil {
-			return fmt.Errorf("copying page %s: %w", page.Path, err)
+			return fmt.Errorf("failed to copy page %s: %w", page.Path, err)
 		}
 	}
 
@@ -189,7 +189,7 @@ func generateSkill(s *site.Site, w io.Writer, config Config, name string) error 
 		AllowedTools:  config.AllowedTools,
 		Metadata:      config.Metadata,
 	}, metadecoders.YAML, w); err != nil {
-		return fmt.Errorf("writing frontmatter: %w", err)
+		return fmt.Errorf("failed to write frontmatter: %w", err)
 	}
 
 	// Body

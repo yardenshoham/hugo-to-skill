@@ -93,12 +93,12 @@ func (s *Section) TotalPages() int {
 func Load(ctx context.Context, dir string, opts LoadOptions, logger *slog.Logger) (*Site, error) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
-		return nil, fmt.Errorf("resolving site directory: %w", err)
+		return nil, fmt.Errorf("failed to resolve site directory: %w", err)
 	}
 
 	built, err := assemble(ctx, absDir, opts, logger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to assemble sites: %w", err)
 	}
 	defer built.cleanup()
 	cfg := built.cfg
@@ -106,7 +106,7 @@ func Load(ctx context.Context, dir string, opts LoadOptions, logger *slog.Logger
 	selectedLang := strings.ToLower(cmp.Or(opts.Lang, cfg.defaultLang))
 	hugoSite, err := selectSite(built.sites.Sites, selectedLang, cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to select site: %w", err)
 	}
 	logger.DebugContext(ctx, "selected language", "lang", selectedLang)
 
@@ -117,7 +117,7 @@ func Load(ctx context.Context, dir string, opts LoadOptions, logger *slog.Logger
 
 	scope, err := cleanScope(opts.ContentPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resolve content path: %w", err)
 	}
 	var scoped *Section
 	if scope != "" {

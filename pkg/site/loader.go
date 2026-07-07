@@ -53,12 +53,12 @@ func assemble(ctx context.Context, absDir string, opts LoadOptions, logger *slog
 	flags := newFlags(absDir)
 	cfg, _, found, err := loadConfig(ctx, flags, logger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to inspect site config: %w", err)
 	}
 
 	overrides, roots, err := contentOverrides(absDir, cfg, found)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resolve content directories: %w", err)
 	}
 
 	shortcodes, err := discoverShortcodes(roots)
@@ -85,13 +85,13 @@ func assemble(ctx context.Context, absDir string, opts LoadOptions, logger *slog
 	cfg, configs, _, err := loadConfig(ctx, flags, logger)
 	if err != nil {
 		cleanup()
-		return nil, err
+		return nil, fmt.Errorf("failed to reload site config: %w", err)
 	}
 
 	sites, err := buildSites(ctx, configs, flags, logger)
 	if err != nil {
 		cleanup()
-		return nil, fmt.Errorf("assembling site: %w", err)
+		return nil, fmt.Errorf("failed to build sites: %w", err)
 	}
 	logger.DebugContext(ctx, "assembled site", "languages", len(sites.Sites), "shortcodeStubs", len(shortcodes))
 	return &assembled{sites: sites, cfg: cfg, cleanup: cleanup}, nil
@@ -221,7 +221,7 @@ func discoverShortcodes(roots []string) (map[string]bool, error) {
 			return nil
 		})
 		if err != nil {
-			return nil, fmt.Errorf("scanning %s for shortcodes: %w", root, err)
+			return nil, fmt.Errorf("failed to scan %s for shortcodes: %w", root, err)
 		}
 	}
 	return inner, nil
@@ -239,7 +239,7 @@ func writeStubLayouts(shortcodes map[string]bool) (layoutsDir string, cleanup fu
 	cleanup = func() {}
 	dir, err := os.MkdirTemp("", "hugo-to-skill-layouts-*")
 	if err != nil {
-		return "", cleanup, fmt.Errorf("creating stub layouts: %w", err)
+		return "", cleanup, fmt.Errorf("failed to create stub layouts: %w", err)
 	}
 	cleanup = func() { _ = os.RemoveAll(dir) }
 	scDir := filepath.Join(dir, "_shortcodes")
@@ -252,11 +252,11 @@ func writeStubLayouts(shortcodes map[string]bool) (layoutsDir string, cleanup fu
 		file := filepath.Join(scDir, filepath.FromSlash(name)+".html")
 		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 			cleanup()
-			return "", func() {}, fmt.Errorf("creating stub layouts: %w", err)
+			return "", func() {}, fmt.Errorf("failed to create stub layouts: %w", err)
 		}
 		if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
 			cleanup()
-			return "", func() {}, fmt.Errorf("creating stub layouts: %w", err)
+			return "", func() {}, fmt.Errorf("failed to create stub layouts: %w", err)
 		}
 	}
 	return dir, cleanup, nil

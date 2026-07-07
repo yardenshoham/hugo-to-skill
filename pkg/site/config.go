@@ -64,7 +64,7 @@ func loadConfig(ctx context.Context, flags config.Provider, logger *slog.Logger)
 		IgnoreModuleDoesNotExist: true,
 	})
 	if err != nil {
-		return nil, nil, true, fmt.Errorf("loading site config: %w", err)
+		return nil, nil, true, fmt.Errorf("failed to load site config: %w", err)
 	}
 	found := len(configs.LoadingInfo.ConfigFiles) > 0
 	logger.DebugContext(ctx, "loaded config", "files", configs.LoadingInfo.ConfigFiles)

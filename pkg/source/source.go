@@ -35,7 +35,7 @@ func Resolve(ctx context.Context, arg string, logger *slog.Logger) (dir string, 
 	if !IsGitURL(arg) {
 		info, err := os.Stat(arg)
 		if err != nil {
-			return "", noop, fmt.Errorf("site path %s: %w", arg, err)
+			return "", noop, fmt.Errorf("failed to stat site path %s: %w", arg, err)
 		}
 		if !info.IsDir() {
 			return "", noop, fmt.Errorf("site path %s is not a directory", arg)
@@ -46,7 +46,7 @@ func Resolve(ctx context.Context, arg string, logger *slog.Logger) (dir string, 
 
 	tmpDir, err := os.MkdirTemp("", "hugo-to-skill-*")
 	if err != nil {
-		return "", noop, fmt.Errorf("creating temporary clone directory: %w", err)
+		return "", noop, fmt.Errorf("failed to create temporary clone directory: %w", err)
 	}
 	cleanup = func() {
 		if err := os.RemoveAll(tmpDir); err != nil {
@@ -68,7 +68,7 @@ func Resolve(ctx context.Context, arg string, logger *slog.Logger) (dir string, 
 	})
 	if err != nil {
 		cleanup()
-		return "", noop, fmt.Errorf("cloning %s: %w", arg, err)
+		return "", noop, fmt.Errorf("failed to clone %s: %w", arg, err)
 	}
 	logger.InfoContext(ctx, "clone complete", "duration", time.Since(start).Round(time.Millisecond))
 

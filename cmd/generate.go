@@ -52,7 +52,7 @@ following the Agent Skills specification for progressive disclosure.`,
 			logger.InfoContext(cmd.Context(), "resolving site source", "source", args[0])
 			dir, cleanup, err := source.Resolve(cmd.Context(), args[0], logger)
 			if err != nil {
-				return fmt.Errorf("resolving site source: %w", err)
+				return fmt.Errorf("failed to resolve site source: %w", err)
 			}
 			defer cleanup()
 
@@ -62,7 +62,7 @@ following the Agent Skills specification for progressive disclosure.`,
 				IncludeDrafts: includeDrafts,
 			}, logger)
 			if err != nil {
-				return fmt.Errorf("loading site: %w", err)
+				return fmt.Errorf("failed to load site: %w", err)
 			}
 
 			config := skill.Config{
@@ -76,7 +76,7 @@ following the Agent Skills specification for progressive disclosure.`,
 			}
 
 			if err := skill.GenerateDir(cmd.Context(), loaded, output, config, logger); err != nil {
-				return fmt.Errorf("generating skill: %w", err)
+				return fmt.Errorf("failed to generate skill: %w", err)
 			}
 
 			logger.InfoContext(cmd.Context(), "skill generation complete", "output", output)
