@@ -3,7 +3,7 @@ module github.com/yardenshoham/hugo-to-skill
 go 1.26.4
 
 require (
-	github.com/go-git/go-git/v5 v5.19.1
+	github.com/go-git/go-git/v5 v5.19.2
 	github.com/gohugoio/hugo v0.164.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cast v1.10.0
@@ -114,7 +114,7 @@ require (
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260625142307-59b4966ccb57 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/text v0.39.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
 	golang.org/x/vuln v1.5.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
